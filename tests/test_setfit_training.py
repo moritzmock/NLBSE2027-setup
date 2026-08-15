@@ -35,6 +35,12 @@ class FakeDataset:
 
 
 class SetFitTrainingTests(unittest.TestCase):
+    def test_defaults_retain_random_five_percent_of_full_training_split(self):
+        args = setfit_training.parse_args([])
+
+        self.assertEqual(args.train_limit, 0)
+        self.assertEqual(args.train_fraction, 0.05)
+
     def test_metrics_contain_both_dimensions_and_average(self):
         metrics = setfit_training.compute_metrics(
             [[1, 0], [0, 1], [1, 1]],
@@ -63,6 +69,13 @@ class SetFitTrainingTests(unittest.TestCase):
 
         self.assertEqual(len(sampled), 100)
         self.assertEqual({tuple(label) for label in sampled.labels}, set(map(tuple, labels)))
+
+    def test_random_fraction_sample_retains_five_percent(self):
+        dataset = FakeDataset([[0, 0]] * 100)
+
+        sampled = training_utils.random_fraction_sample(dataset, fraction=0.05, seed=42)
+
+        self.assertEqual(len(sampled), 5)
 
     def test_metrics_are_written_as_json_and_csv(self):
         validation_metrics = {

@@ -166,8 +166,7 @@ stage.
 ## Fine-tune SetFit
 
 The training script reads the three curated split files. By default, it uses a
-stratified sample of 100 training instances so the configuration can be tested
-before running the full experiment:
+seeded random sample containing 5% of the training split:
 
 ```bash
 ./env/bin/python setfit_train.py
@@ -185,7 +184,7 @@ training.
 Run on the complete training split with:
 
 ```bash
-./env/bin/python setfit_train.py --train-limit 0
+./env/bin/python setfit_train.py --train-fraction 1
 ```
 
 Example with a different model and output directory:

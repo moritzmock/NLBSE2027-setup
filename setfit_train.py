@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Fine-tune SetFit on the dataset produced by ``curate_dataset.py``.
 
-Training uses at most 100 stratified examples by default. Every epoch is saved,
-validation runs after every epoch, and final metrics cover validation and test.
+Training uses a seeded random 5% of the training split by default. Every epoch
+is saved, validation runs after every epoch, and final metrics cover validation
+and test.
 """
 
 from __future__ import annotations
@@ -33,12 +34,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default_output_dir="models/setfit",
         default_epochs=5,
         default_batch_size=32,
+        default_train_limit=0,
     )
     parser.add_argument("--num-iterations", type=int, default=20)
+    parser.add_argument(
+        "--train-fraction",
+        type=float,
+        default=0.05,
+        help="Random fraction of the selected training rows to retain.",
+    )
     args = parser.parse_args(argv)
     validate_common_training_arguments(parser, args)
     if args.num_iterations < 1:
         parser.error("--num-iterations must be at least 1")
+    if not 0 < args.train_fraction <= 1:
+        parser.error("--train-fraction must be greater than 0 and at most 1")
     return args
 
 
@@ -59,7 +69,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(args)
     load_dataset, SetFitModel, Trainer, TrainingArguments = import_training_dependencies()
     train_dataset, validation_dataset, test_dataset = load_prepared_splits(
-        load_dataset, args.data_dir, args.train_limit, args.seed
+        load_dataset,
+        args.data_dir,
+        args.train_limit,
+        args.seed,
+        train_fraction=args.train_fraction,
     )
 
     checkpoint_dir = args.output_dir / "checkpoints"

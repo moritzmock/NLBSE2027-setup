@@ -55,4 +55,8 @@ echo "Python: $(command -v python)"
 python --version
 nvidia-smi
 
-srun python -u setfit_train.py --num-iterations 2 --data-dir "${DATA_DIR}" --train-limit 0 "$@"
+srun python -u setfit_train.py \
+    --data-dir "${DATA_DIR}" \
+    --train-limit 0 \
+    --train-fraction 0.05 \
+    "$@"

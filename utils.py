@@ -34,6 +34,7 @@ def add_common_training_arguments(
     default_output_dir: str,
     default_epochs: int,
     default_batch_size: int,
+    default_train_limit: int = 100,
 ) -> None:
     parser.add_argument(
         "--data-dir",
@@ -57,7 +58,7 @@ def add_common_training_arguments(
     parser.add_argument(
         "--train-limit",
         type=int,
-        default=100,
+        default=default_train_limit,
         help="Maximum training rows; use 0 for the complete training split.",
     )
     parser.add_argument("--seed", type=int, default=42)
@@ -220,6 +221,17 @@ def stratified_sample(dataset: Any, limit: int, seed: int) -> Any:
     return dataset.select(selected)
 
 
+def random_fraction_sample(dataset: Any, fraction: float, seed: int) -> Any:
+    """Randomly retain ``fraction`` of a dataset using a reproducible shuffle."""
+    if not 0 < fraction <= 1:
+        raise ValueError("Training fraction must be greater than 0 and at most 1")
+    if fraction == 1 or len(dataset) == 0:
+        return dataset
+
+    retained_rows = max(1, int(len(dataset) * fraction))
+    return dataset.shuffle(seed=seed).select(range(retained_rows))
+
+
 def validate_training_labels(dataset: Any) -> None:
     matrix = normalize_binary_matrix(dataset["label"], "training labels")
     for index, label_name in enumerate(LABEL_NAMES):
@@ -231,7 +243,11 @@ def validate_training_labels(dataset: Any) -> None:
 
 
 def load_prepared_splits(
-    load_dataset: Any, data_dir: Path, train_limit: int, seed: int
+    load_dataset: Any,
+    data_dir: Path,
+    train_limit: int,
+    seed: int,
+    train_fraction: float = 1.0,
 ) -> tuple[Any, Any, Any]:
     data_files = {name: str(data_dir / filename) for name, filename in SPLIT_FILES.items()}
     missing = [path for path in data_files.values() if not Path(path).is_file()]
@@ -246,6 +262,7 @@ def load_prepared_splits(
     train_dataset = stratified_sample(
         prepare_dataset(data["train"]), train_limit, seed
     )
+    train_dataset = random_fraction_sample(train_dataset, train_fraction, seed)
     validation_dataset = prepare_dataset(data["validation"])
     test_dataset = prepare_dataset(data["test"])
     validate_training_labels(train_dataset)
