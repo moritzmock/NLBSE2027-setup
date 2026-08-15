@@ -56,6 +56,7 @@ def import_training_dependencies() -> tuple[Any, Any, Any, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    print(args)
     load_dataset, SetFitModel, Trainer, TrainingArguments = import_training_dependencies()
     train_dataset, validation_dataset, test_dataset = load_prepared_splits(
         load_dataset, args.data_dir, args.train_limit, args.seed

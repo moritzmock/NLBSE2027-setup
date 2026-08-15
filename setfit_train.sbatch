@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu-low
-#SBATCH --constraint=gpu80g
+#SBATCH --constraint=gpu32g
 #SBATCH --time=20-00:00:00
 #SBATCH --mem=80G
 #SBATCH --output=%j-setfit.out
@@ -55,4 +55,4 @@ echo "Python: $(command -v python)"
 python --version
 nvidia-smi
 
-srun python -u setfit_train.py --data-dir "${DATA_DIR}" --train-limit 0 "$@"
+srun python -u setfit_train.py --num-iterations 2 --data-dir "${DATA_DIR}" --train-limit 0 "$@"
