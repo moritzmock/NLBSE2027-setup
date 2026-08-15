@@ -1,4 +1,4 @@
-# MADE-WIC Dataset Curation and SetFit Training
+# MADE-WIC Dataset Curation, SetFit, and CodeBERT Training
 
 This repository builds a unified function-level dataset from the three
 MADE-WIC datasets and fine-tunes either a SetFit or CodeBERT multi-output
