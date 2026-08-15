@@ -1,3 +1,4 @@
+import csv
 import importlib.util
 import json
 import tempfile
@@ -40,8 +41,18 @@ class SetFitTrainingTests(unittest.TestCase):
             [[1, 0], [1, 1], [1, 0]],
         )
 
+        self.assertEqual(set(metrics), set(training_utils.METRIC_NAMES))
         self.assertAlmostEqual(metrics["weakness_f1"], 0.8)
+        self.assertAlmostEqual(metrics["weakness_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["weakness_precision"], 1.0)
+        self.assertAlmostEqual(metrics["weakness_recall"], 2 / 3)
         self.assertAlmostEqual(metrics["MAT_f1"], 2 / 3)
+        self.assertAlmostEqual(metrics["MAT_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["MAT_precision"], 0.5)
+        self.assertAlmostEqual(metrics["MAT_recall"], 1.0)
+        self.assertAlmostEqual(metrics["average_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["average_precision"], 0.75)
+        self.assertAlmostEqual(metrics["average_recall"], 5 / 6)
         self.assertAlmostEqual(metrics["average_f1"], (0.8 + 2 / 3) / 2)
 
     def test_stratified_sample_uses_100_rows_and_retains_joint_labels(self):
@@ -54,9 +65,14 @@ class SetFitTrainingTests(unittest.TestCase):
         self.assertEqual({tuple(label) for label in sampled.labels}, set(map(tuple, labels)))
 
     def test_metrics_are_written_as_json_and_csv(self):
+        validation_metrics = {
+            name: (index + 1) / 100
+            for index, name in enumerate(training_utils.METRIC_NAMES)
+        }
+        test_metrics = {name: value + 0.1 for name, value in validation_metrics.items()}
         metrics = {
-            "validation": {"weakness_f1": 0.5, "MAT_f1": 0.25, "average_f1": 0.375},
-            "test": {"weakness_f1": 0.75, "MAT_f1": 0.5, "average_f1": 0.625},
+            "validation": validation_metrics,
+            "test": test_metrics,
         }
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
@@ -65,24 +81,24 @@ class SetFitTrainingTests(unittest.TestCase):
 
             with (output_dir / "metrics.json").open(encoding="utf-8") as handle:
                 self.assertEqual(json.load(handle), metrics)
-            csv_text = (output_dir / "metrics.csv").read_text(encoding="utf-8")
-            self.assertIn("split,weakness_f1,MAT_f1,average_f1", csv_text)
-            self.assertIn("validation,0.5,0.25,0.375", csv_text)
+            with (output_dir / "metrics.csv").open(newline="", encoding="utf-8") as handle:
+                reader = csv.DictReader(handle)
+                rows = list(reader)
+            self.assertEqual(reader.fieldnames, ["split", *training_utils.METRIC_NAMES])
+            self.assertEqual(rows[0]["split"], "validation")
+            self.assertEqual(float(rows[0]["weakness_accuracy"]), 0.01)
 
     def test_prefixed_transformer_metrics_are_normalized(self):
-        metrics = {
-            "validation_loss": 0.1,
-            "validation_weakness_f1": 0.5,
-            "validation_MAT_f1": 0.25,
-            "validation_average_f1": 0.375,
+        expected = {
+            name: (index + 1) / 100
+            for index, name in enumerate(training_utils.METRIC_NAMES)
         }
+        metrics = {f"validation_{name}": value for name, value in expected.items()}
+        metrics["validation_loss"] = 0.1
 
-        normalized = training_utils.extract_f1_metrics(metrics, "validation")
+        normalized = training_utils.extract_evaluation_metrics(metrics, "validation")
 
-        self.assertEqual(
-            normalized,
-            {"weakness_f1": 0.5, "MAT_f1": 0.25, "average_f1": 0.375},
-        )
+        self.assertEqual(normalized, expected)
 
 
 if __name__ == "__main__":

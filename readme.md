@@ -285,13 +285,24 @@ contains the final trained model.
 
 CodeBERT uses the same structure below `models/codebert`.
 
-Both metrics files contain results for the validation and test splits:
+Both metrics files contain results for the validation and test splits. Each
+metric is calculated independently for the weakness and MAT dimensions, then
+averaged across both dimensions:
 
 | Metric | Description |
 | --- | --- |
-| `weakness_f1` | F1 score for the aggregated weakness dimension. |
-| `MAT_f1` | F1 score for the MAT dimension. |
-| `average_f1` | Unweighted mean of `weakness_f1` and `MAT_f1`. |
+| `weakness_accuracy` | Binary accuracy for the aggregated weakness dimension. |
+| `weakness_precision` | Positive-class precision for the weakness dimension. |
+| `weakness_recall` | Positive-class recall for the weakness dimension. |
+| `weakness_f1` | Positive-class F1 for the weakness dimension. |
+| `MAT_accuracy` | Binary accuracy for the MAT dimension. |
+| `MAT_precision` | Positive-class precision for the MAT dimension. |
+| `MAT_recall` | Positive-class recall for the MAT dimension. |
+| `MAT_f1` | Positive-class F1 for the MAT dimension. |
+| `average_accuracy` | Unweighted mean of both accuracy values. |
+| `average_precision` | Unweighted mean of both precision values. |
+| `average_recall` | Unweighted mean of both recall values. |
+| `average_f1` | Unweighted mean of both F1 values. |
 
 ## Troubleshooting
 

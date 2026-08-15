@@ -14,7 +14,12 @@ import numpy as np
 
 
 LABEL_NAMES = ("weakness", "MAT")
-F1_METRIC_NAMES = ("weakness_f1", "MAT_f1", "average_f1")
+DIMENSION_METRICS = ("accuracy", "precision", "recall", "f1")
+METRIC_NAMES = tuple(
+    f"{label_name}_{metric_name}"
+    for label_name in LABEL_NAMES
+    for metric_name in DIMENSION_METRICS
+) + tuple(f"average_{metric_name}" for metric_name in DIMENSION_METRICS)
 SPLIT_FILES = {
     "train": "train.csv",
     "validation": "validation.csv",
@@ -88,7 +93,7 @@ def normalize_binary_matrix(values: Any, name: str) -> np.ndarray:
 
 
 def compute_binary_metrics(predictions: Any, references: Any) -> dict[str, float]:
-    """Return per-dimension F1 and their unweighted macro average."""
+    """Return binary metrics per dimension and their unweighted macro means."""
     predictions_array = normalize_binary_matrix(predictions, "predictions")
     references_array = normalize_binary_matrix(references, "references")
     if predictions_array.shape != references_array.shape:
@@ -98,18 +103,37 @@ def compute_binary_metrics(predictions: Any, references: Any) -> dict[str, float
         )
 
     metrics: dict[str, float] = {}
-    f1_scores: list[float] = []
+    scores: dict[str, list[float]] = {
+        metric_name: [] for metric_name in DIMENSION_METRICS
+    }
     for index, label_name in enumerate(LABEL_NAMES):
         predicted = predictions_array[:, index]
         expected = references_array[:, index]
         true_positives = int(np.sum((predicted == 1) & (expected == 1)))
         false_positives = int(np.sum((predicted == 1) & (expected == 0)))
+        true_negatives = int(np.sum((predicted == 0) & (expected == 0)))
         false_negatives = int(np.sum((predicted == 0) & (expected == 1)))
-        denominator = 2 * true_positives + false_positives + false_negatives
-        f1 = 2 * true_positives / denominator if denominator else 0.0
-        metrics[f"{label_name}_f1"] = float(f1)
-        f1_scores.append(float(f1))
-    metrics["average_f1"] = float(np.mean(f1_scores))
+        row_count = true_positives + false_positives + true_negatives + false_negatives
+        precision_denominator = true_positives + false_positives
+        recall_denominator = true_positives + false_negatives
+        f1_denominator = 2 * true_positives + false_positives + false_negatives
+        dimension_scores = {
+            "accuracy": (true_positives + true_negatives) / row_count
+            if row_count
+            else 0.0,
+            "precision": true_positives / precision_denominator
+            if precision_denominator
+            else 0.0,
+            "recall": true_positives / recall_denominator
+            if recall_denominator
+            else 0.0,
+            "f1": 2 * true_positives / f1_denominator if f1_denominator else 0.0,
+        }
+        for metric_name, score in dimension_scores.items():
+            metrics[f"{label_name}_{metric_name}"] = float(score)
+            scores[metric_name].append(float(score))
+    for metric_name, metric_scores in scores.items():
+        metrics[f"average_{metric_name}"] = float(np.mean(metric_scores))
     return metrics
 
 
@@ -228,11 +252,11 @@ def load_prepared_splits(
     return train_dataset, validation_dataset, test_dataset
 
 
-def extract_f1_metrics(
+def extract_evaluation_metrics(
     metrics: Mapping[str, Any], metric_key_prefix: str | None = None
 ) -> dict[str, float]:
     result: dict[str, float] = {}
-    for name in F1_METRIC_NAMES:
+    for name in METRIC_NAMES:
         prefixed_name = f"{metric_key_prefix}_{name}" if metric_key_prefix else name
         source_name = prefixed_name if prefixed_name in metrics else name
         if source_name not in metrics:
@@ -250,7 +274,7 @@ def write_metrics(output_dir: Path, metrics: Mapping[str, Mapping[str, float]]) 
 
     csv_path = output_dir / "metrics.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=("split", *F1_METRIC_NAMES))
+        writer = csv.DictWriter(handle, fieldnames=("split", *METRIC_NAMES))
         writer.writeheader()
         for split_name, split_metrics in metrics.items():
             writer.writerow({"split": split_name, **split_metrics})

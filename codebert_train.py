@@ -17,7 +17,7 @@ from utils import (
     LABEL_NAMES,
     add_common_training_arguments,
     compute_binary_metrics,
-    extract_f1_metrics,
+    extract_evaluation_metrics,
     load_prepared_splits,
     validate_common_training_arguments,
     write_metrics,
@@ -169,13 +169,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokenizer.save_pretrained(str(final_model_dir))
 
     metrics = {
-        "validation": extract_f1_metrics(
+        "validation": extract_evaluation_metrics(
             trainer.evaluate(
                 validation_dataset, metric_key_prefix="validation"
             ),
             "validation",
         ),
-        "test": extract_f1_metrics(
+        "test": extract_evaluation_metrics(
             trainer.evaluate(test_dataset, metric_key_prefix="test"), "test"
         ),
     }

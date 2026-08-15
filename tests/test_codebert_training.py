@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import numpy as np
 from datasets import Dataset
 
+import utils as training_utils
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "codebert_train.py"
 SPEC = importlib.util.spec_from_file_location("codebert_training_script", SCRIPT_PATH)
@@ -30,8 +32,18 @@ class CodeBERTTrainingTests(unittest.TestCase):
 
         metrics = codebert_training.compute_metrics(evaluation)
 
+        self.assertEqual(set(metrics), set(training_utils.METRIC_NAMES))
         self.assertAlmostEqual(metrics["weakness_f1"], 0.8)
+        self.assertAlmostEqual(metrics["weakness_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["weakness_precision"], 1.0)
+        self.assertAlmostEqual(metrics["weakness_recall"], 2 / 3)
         self.assertAlmostEqual(metrics["MAT_f1"], 2 / 3)
+        self.assertAlmostEqual(metrics["MAT_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["MAT_precision"], 0.5)
+        self.assertAlmostEqual(metrics["MAT_recall"], 1.0)
+        self.assertAlmostEqual(metrics["average_accuracy"], 2 / 3)
+        self.assertAlmostEqual(metrics["average_precision"], 0.75)
+        self.assertAlmostEqual(metrics["average_recall"], 5 / 6)
         self.assertAlmostEqual(metrics["average_f1"], (0.8 + 2 / 3) / 2)
 
     def test_sigmoid_is_stable_for_extreme_logits(self):
