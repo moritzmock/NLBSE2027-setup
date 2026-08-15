@@ -6,4 +6,5 @@ MADE-WIC/
 __pycache__/
 curated_dataset_steps/
 env/
+data/
 models/

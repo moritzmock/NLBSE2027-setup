@@ -19,7 +19,7 @@ module load python/3.11.7-gcc12.1.0-x86_64
 
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 ENV_DIR="${PROJECT_DIR}/env"
-DATA_DIR="${DATA_DIR:-${PROJECT_DIR}/curated_dataset_steps}"
+DATA_DIR="${DATA_DIR:-${PROJECT_DIR}/data}"
 
 cd "${PROJECT_DIR}"
 
