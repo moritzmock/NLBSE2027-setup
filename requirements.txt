@@ -1,0 +1,13 @@
+accelerate==1.8.1
+datasets==3.6.0
+evaluate==0.4.4
+numpy==2.4.6
+pandas==3.0.3
+pyarrow==20.0.0
+scikit-learn==1.7.0
+sentence-transformers==4.1.0
+setfit==1.1.2
+tiktoken==0.13.0
+torch==2.7.1
+tqdm==4.70.0
+transformers==4.51.3

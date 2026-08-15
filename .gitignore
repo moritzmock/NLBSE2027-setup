@@ -1,0 +1,9 @@
+.DS_Store
+*.err
+*.out
+*.py[cod]
+MADE-WIC/
+__pycache__/
+curated_dataset_steps/
+env/
+models/
