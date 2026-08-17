@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import utils as training_utils
 
@@ -35,11 +36,55 @@ class FakeDataset:
 
 
 class SetFitTrainingTests(unittest.TestCase):
+    def test_bounded_pair_sampler_emits_requested_balanced_multilabel_pairs(self):
+        sentences = ["none-a", "none-b", "weak", "mat", "both"]
+        labels = [[0, 0], [0, 0], [1, 0], [0, 1], [1, 1]]
+
+        pairs = list(
+            setfit_training.iter_contrastive_pairs(
+                sentences,
+                labels,
+                pairs_per_kind=12,
+                seed=42,
+            )
+        )
+
+        self.assertEqual(len(pairs), 24)
+        self.assertEqual([pair["label"] for pair in pairs].count(1.0), 12)
+        self.assertEqual([pair["label"] for pair in pairs].count(0.0), 12)
+        labels_by_sentence = dict(zip(sentences, labels))
+        for pair in pairs:
+            left = labels_by_sentence[pair["sentence_1"]]
+            right = labels_by_sentence[pair["sentence_2"]]
+            expected = float(any(a and b for a, b in zip(left, right)))
+            self.assertEqual(pair["label"], expected)
+
+    def test_training_dependencies_use_memory_efficient_trainer(self):
+        _, _, trainer_class, training_arguments = (
+            setfit_training.import_training_dependencies()
+        )
+        trainer = object.__new__(trainer_class)
+        trainer.model = SimpleNamespace(
+            model_body=object(),
+            multi_target_strategy="multi-output",
+        )
+        args = training_arguments(num_iterations=2, report_to="none")
+
+        dataset, _ = trainer.get_dataset(
+            ["none", "weak", "mat", "both"],
+            [[0, 0], [1, 0], [0, 1], [1, 1]],
+            args,
+        )
+
+        self.assertEqual(trainer_class.__name__, "MemoryEfficientTrainer")
+        self.assertEqual(len(dataset), 16)
+
     def test_defaults_retain_random_five_percent_of_full_training_split(self):
         args = setfit_training.parse_args([])
 
         self.assertEqual(args.train_limit, 0)
         self.assertEqual(args.train_fraction, 0.05)
+        self.assertEqual(args.embedding_eval_limit, 1000)
 
     def test_metrics_contain_both_dimensions_and_average(self):
         metrics = setfit_training.compute_metrics(

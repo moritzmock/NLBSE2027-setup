@@ -175,11 +175,15 @@ seeded random sample containing 5% of the training split:
 The default model is
 `sentence-transformers/paraphrase-MiniLM-L6-v2` with SetFit's `multi-output`
 strategy. Training uses five epochs, a batch size of 32, and 20 contrastive
-pair-generation iterations.
+pair-generation iterations. Contrastive pairs are sampled directly in bounded
+memory instead of enumerating every possible pair.
 
-Validation is performed after every epoch. After training, the final model is
-evaluated on both the validation and test splits. Test data is never used for
-training.
+Validation is performed after every epoch using a stratified sample of at most
+1,000 rows by default. This avoids generating an unnecessarily large embedding
+validation dataset. After training, the final model is evaluated on the complete
+validation and test splits. Test data is never used for training. Change the
+embedding validation cap with `--embedding-eval-limit`; use `0` for the full
+validation split.
 
 Run on the complete training split with:
 
