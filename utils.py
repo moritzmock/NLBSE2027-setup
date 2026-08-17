@@ -181,55 +181,45 @@ def stratified_sample(dataset: Any, limit: int, seed: int) -> Any:
         )
 
     rng = random.Random(seed)
-    selected: list[int] = []
-    remaining_by_class: dict[tuple[int, int], list[int]] = {}
-    for key, indices in sorted(grouped.items()):
+    for indices in grouped.values():
         rng.shuffle(indices)
-        selected.append(indices[0])
-        remaining_by_class[key] = indices[1:]
 
-    remaining_slots = limit - len(selected)
-    population = sum(len(indices) for indices in remaining_by_class.values())
     exact = {
-        key: remaining_slots * len(indices) / population
-        for key, indices in remaining_by_class.items()
+        key: limit * len(indices) / len(dataset) for key, indices in grouped.items()
     }
-    counts = {
-        key: min(len(remaining_by_class[key]), int(exact[key])) for key in exact
-    }
-    unallocated = remaining_slots - sum(counts.values())
-    ranked = sorted(
-        exact,
-        key=lambda key: (exact[key] - int(exact[key]), len(remaining_by_class[key]), key),
-        reverse=True,
-    )
-    while unallocated:
-        made_progress = False
-        for key in ranked:
-            if counts[key] < len(remaining_by_class[key]):
-                counts[key] += 1
-                unallocated -= 1
-                made_progress = True
-                if unallocated == 0:
-                    break
-        if not made_progress:
+    counts = {key: 1 for key in grouped}
+    while sum(counts.values()) < limit:
+        eligible = [key for key in grouped if counts[key] < len(grouped[key])]
+        if not eligible:
             raise RuntimeError("Could not allocate the requested stratified sample")
+        key = max(
+            eligible,
+            key=lambda candidate: (
+                exact[candidate] - counts[candidate],
+                len(grouped[candidate]),
+                candidate,
+            ),
+        )
+        counts[key] += 1
 
-    for key, count in counts.items():
-        selected.extend(remaining_by_class[key][:count])
+    selected = [
+        index
+        for key, count in counts.items()
+        for index in grouped[key][:count]
+    ]
     rng.shuffle(selected)
     return dataset.select(selected)
 
 
-def random_fraction_sample(dataset: Any, fraction: float, seed: int) -> Any:
-    """Randomly retain ``fraction`` of a dataset using a reproducible shuffle."""
+def stratified_fraction_sample(dataset: Any, fraction: float, seed: int) -> Any:
+    """Retain a fraction while preserving the joint label distribution."""
     if not 0 < fraction <= 1:
         raise ValueError("Training fraction must be greater than 0 and at most 1")
     if fraction == 1 or len(dataset) == 0:
         return dataset
 
     retained_rows = max(1, int(len(dataset) * fraction))
-    return dataset.shuffle(seed=seed).select(range(retained_rows))
+    return stratified_sample(dataset, retained_rows, seed)
 
 
 def validate_training_labels(dataset: Any) -> None:
@@ -262,7 +252,7 @@ def load_prepared_splits(
     train_dataset = stratified_sample(
         prepare_dataset(data["train"]), train_limit, seed
     )
-    train_dataset = random_fraction_sample(train_dataset, train_fraction, seed)
+    train_dataset = stratified_fraction_sample(train_dataset, train_fraction, seed)
     validation_dataset = prepare_dataset(data["validation"])
     test_dataset = prepare_dataset(data["test"])
     validate_training_labels(train_dataset)

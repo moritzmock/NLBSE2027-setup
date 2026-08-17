@@ -3,6 +3,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -79,7 +80,7 @@ class SetFitTrainingTests(unittest.TestCase):
         self.assertEqual(trainer_class.__name__, "MemoryEfficientTrainer")
         self.assertEqual(len(dataset), 16)
 
-    def test_defaults_retain_random_five_percent_of_full_training_split(self):
+    def test_defaults_retain_stratified_five_percent_of_full_training_split(self):
         args = setfit_training.parse_args([])
 
         self.assertEqual(args.train_limit, 0)
@@ -115,12 +116,24 @@ class SetFitTrainingTests(unittest.TestCase):
         self.assertEqual(len(sampled), 100)
         self.assertEqual({tuple(label) for label in sampled.labels}, set(map(tuple, labels)))
 
-    def test_random_fraction_sample_retains_five_percent(self):
-        dataset = FakeDataset([[0, 0]] * 100)
+    def test_fraction_sample_retains_five_percent_and_joint_distribution(self):
+        labels = (
+            [[0, 0]] * 1000
+            + [[0, 1]] * 600
+            + [[1, 0]] * 300
+            + [[1, 1]] * 100
+        )
+        dataset = FakeDataset(labels)
 
-        sampled = training_utils.random_fraction_sample(dataset, fraction=0.05, seed=42)
+        sampled = training_utils.stratified_fraction_sample(
+            dataset, fraction=0.05, seed=42
+        )
 
-        self.assertEqual(len(sampled), 5)
+        self.assertEqual(len(sampled), 100)
+        self.assertEqual(
+            Counter(map(tuple, sampled.labels)),
+            Counter({(0, 0): 50, (0, 1): 30, (1, 0): 15, (1, 1): 5}),
+        )
 
     def test_metrics_are_written_as_json_and_csv(self):
         validation_metrics = {

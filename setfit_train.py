@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Fine-tune SetFit on the dataset produced by ``curate_dataset.py``.
 
-Training uses a seeded random 5% of the training split by default. Every epoch
-is saved, validation runs after every epoch, and final metrics cover validation
-and test.
+Training uses a seeded, joint-label-stratified 5% of the training split by
+default. Every epoch is saved, validation runs after every epoch, and final
+metrics cover validation and test.
 """
 
 from __future__ import annotations
@@ -97,7 +97,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     add_common_training_arguments(
         parser,
         default_model_id="sentence-transformers/paraphrase-MiniLM-L6-v2",
-        default_output_dir="models/setfit",
+        default_output_dir="models/setfit-2",
         default_epochs=5,
         default_batch_size=32,
         default_train_limit=0,
@@ -107,7 +107,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--train-fraction",
         type=float,
         default=0.05,
-        help="Random fraction of the selected training rows to retain.",
+        help=(
+            "Fraction of selected training rows to retain while preserving the "
+            "joint weakness/MAT distribution."
+        ),
     )
     parser.add_argument(
         "--embedding-eval-limit",

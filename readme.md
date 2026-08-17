@@ -166,7 +166,9 @@ stage.
 ## Fine-tune SetFit
 
 The training script reads the three curated split files. By default, it uses a
-seeded random sample containing 5% of the training split:
+seeded, stratified sample containing 5% of the training split. Sampling preserves
+the joint `[weakness, MAT]` distribution and therefore both individual label
+distributions:
 
 ```bash
 ./env/bin/python setfit_train.py
