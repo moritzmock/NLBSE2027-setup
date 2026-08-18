@@ -2,6 +2,7 @@ import importlib.util
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 from datasets import Dataset
@@ -91,6 +92,103 @@ class CodeBERTTrainingTests(unittest.TestCase):
         self.assertEqual(tokenizer.call[1:], (True, 512))
         self.assertEqual(tokenized.column_names, ["input_ids", "attention_mask", "labels"])
         self.assertEqual(tokenized["labels"], [[1.0, 0.0], [0.0, 1.0]])
+
+    def test_validation_and_test_are_evaluated_only_after_training(self):
+        events = []
+        train_dataset = ["train"]
+        validation_dataset = ["validation"]
+        test_dataset = ["test"]
+        metric_values = {name: 1.0 for name in training_utils.METRIC_NAMES}
+
+        class FakeTokenizer:
+            @classmethod
+            def from_pretrained(cls, _model_id):
+                return cls()
+
+            def save_pretrained(self, _path):
+                events.append("save-tokenizer")
+
+        class FakeModel:
+            @classmethod
+            def from_pretrained(cls, *_args, **_kwargs):
+                return cls()
+
+        class FakeDataCollator:
+            def __init__(self, tokenizer):
+                self.tokenizer = tokenizer
+
+        class FakeTrainingArguments:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        class FakeTrainer:
+            instance = None
+
+            def __init__(self, **kwargs):
+                type(self).instance = self
+                self.kwargs = kwargs
+
+            def train(self):
+                events.append("train")
+
+            def save_model(self, _path):
+                events.append("save-model")
+
+            def evaluate(self, dataset, metric_key_prefix):
+                split = "validation" if dataset is validation_dataset else "test"
+                events.append(f"evaluate:{split}")
+                return {
+                    f"{metric_key_prefix}_{name}": value
+                    for name, value in metric_values.items()
+                }
+
+        with (
+            mock.patch.object(
+                codebert_training,
+                "import_training_dependencies",
+                return_value=(
+                    object(),
+                    FakeModel,
+                    FakeTokenizer,
+                    FakeDataCollator,
+                    FakeTrainer,
+                    FakeTrainingArguments,
+                ),
+            ),
+            mock.patch.object(
+                codebert_training,
+                "load_prepared_splits",
+                return_value=(
+                    train_dataset,
+                    validation_dataset,
+                    test_dataset,
+                    training_utils.LABEL_NAMES,
+                ),
+            ),
+            mock.patch.object(
+                codebert_training,
+                "tokenize_dataset",
+                side_effect=lambda dataset, _tokenizer, _max_length: dataset,
+            ),
+            mock.patch.object(codebert_training, "write_metrics"),
+        ):
+            exit_code = codebert_training.main(["--output-dir", "unused"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            events,
+            [
+                "train",
+                "save-model",
+                "save-tokenizer",
+                "evaluate:validation",
+                "evaluate:test",
+            ],
+        )
+        trainer = FakeTrainer.instance
+        self.assertIsNotNone(trainer)
+        self.assertNotIn("eval_dataset", trainer.kwargs)
+        self.assertEqual(trainer.kwargs["args"].kwargs["eval_strategy"], "no")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fine-tune CodeBERT on the dataset produced by ``curate_dataset.py``.
 
-Training uses at most 100 stratified examples by default. Every epoch is saved,
-validation runs after every epoch, and final metrics cover validation and test.
+Training uses at most 100 stratified examples by default. Every epoch is saved
+without consulting validation data. Final metrics cover validation and test.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         per_device_eval_batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
-        eval_strategy="epoch",
+        eval_strategy="no",
         save_strategy="epoch",
         save_total_limit=None,
         logging_strategy="epoch",
@@ -161,7 +161,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=validation_dataset,
         processing_class=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
         compute_metrics=partial(compute_metrics, label_names=label_names),
@@ -172,6 +171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     trainer.save_model(str(final_model_dir))
     tokenizer.save_pretrained(str(final_model_dir))
 
+    print("Fine-tuning complete; evaluating validation and test splits")
     metrics = {
         "validation": extract_evaluation_metrics(
             trainer.evaluate(

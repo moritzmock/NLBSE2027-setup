@@ -216,8 +216,9 @@ two-dimensional multi-label sequence-classification head. Functions are
 truncated to at most 512 CodeBERT tokens, and predictions use a sigmoid
 threshold of 0.5 for each label dimension.
 
-Validation is performed after every epoch. The final model is evaluated on
-both the validation and test splits.
+Validation data is not used during fine-tuning. After all training epochs have
+completed, the final model is evaluated once on the complete validation split
+and once on the complete test split.
 
 Run CodeBERT on the complete training split with:
 
