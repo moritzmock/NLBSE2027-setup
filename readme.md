@@ -180,12 +180,9 @@ strategy. Training uses five epochs, a batch size of 32, and 20 contrastive
 pair-generation iterations. Contrastive pairs are sampled directly in bounded
 memory instead of enumerating every possible pair.
 
-Validation is performed after every epoch using a stratified sample of at most
-1,000 rows by default. This avoids generating an unnecessarily large embedding
-validation dataset. After training, the final model is evaluated on the complete
-validation and test splits. Test data is never used for training. Change the
-embedding validation cap with `--embedding-eval-limit`; use `0` for the full
-validation split.
+Validation data is not used during fine-tuning. After all training epochs have
+completed, the final model is evaluated once on the complete validation split
+and once on the complete test split. Test data is also never used for training.
 
 Run on the complete training split with:
 

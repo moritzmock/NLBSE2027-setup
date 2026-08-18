@@ -46,6 +46,25 @@ class CodeBERTTrainingTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["average_recall"], 5 / 6)
         self.assertAlmostEqual(metrics["average_f1"], (0.8 + 2 / 3) / 2)
 
+    def test_metrics_dynamically_support_four_dimensions(self):
+        evaluation = SimpleNamespace(
+            predictions=np.array([[4.0, -4.0, 4.0, -4.0]]),
+            label_ids=np.array([[1, 0, 1, 0]]),
+        )
+
+        metrics = codebert_training.compute_metrics(
+            evaluation, training_utils.LABEL_SCHEMAS[4]
+        )
+
+        self.assertEqual(
+            set(metrics),
+            set(training_utils.metric_names(training_utils.LABEL_SCHEMAS[4])),
+        )
+        self.assertEqual(metrics["OSPR_f1"], 1.0)
+        self.assertEqual(metrics["DEVIGN_accuracy"], 1.0)
+        self.assertEqual(metrics["BIGVUL_f1"], 1.0)
+        self.assertEqual(metrics["MAT_accuracy"], 1.0)
+
     def test_sigmoid_is_stable_for_extreme_logits(self):
         probabilities = codebert_training.sigmoid([[-1000.0, 1000.0]])
 

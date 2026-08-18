@@ -2,8 +2,8 @@
 """Fine-tune SetFit on the dataset produced by ``curate_dataset.py``.
 
 Training uses a seeded, joint-label-stratified 5% of the training split by
-default. Every epoch is saved, validation runs after every epoch, and final
-metrics cover validation and test.
+default. Every epoch is saved without consulting validation data. After
+fine-tuning, the final model is evaluated on the full validation and test sets.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import json
 import random
 from collections import defaultdict
 from collections.abc import Iterator
+from functools import partial
 from typing import Any, Sequence
 
 from utils import (
@@ -21,7 +22,6 @@ from utils import (
     compute_binary_metrics,
     extract_evaluation_metrics,
     load_prepared_splits,
-    stratified_sample,
     validate_common_training_arguments,
     write_metrics,
 )
@@ -112,23 +112,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "joint weakness/MAT distribution."
         ),
     )
-    parser.add_argument(
-        "--embedding-eval-limit",
-        type=int,
-        default=1000,
-        help=(
-            "Maximum stratified validation rows used during embedding training; "
-            "the final validation evaluation still uses every row."
-        ),
-    )
     args = parser.parse_args(argv)
     validate_common_training_arguments(parser, args)
     if args.num_iterations < 1:
         parser.error("--num-iterations must be at least 1")
     if not 0 < args.train_fraction <= 1:
         parser.error("--train-fraction must be greater than 0 and at most 1")
-    if args.embedding_eval_limit < 0:
-        parser.error("--embedding-eval-limit cannot be negative")
     return args
 
 
@@ -188,17 +177,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     print(args)
     load_dataset, SetFitModel, Trainer, TrainingArguments = import_training_dependencies()
-    train_dataset, validation_dataset, test_dataset = load_prepared_splits(
+    train_dataset, validation_dataset, test_dataset, label_names = load_prepared_splits(
         load_dataset,
         args.data_dir,
         args.train_limit,
         args.seed,
         train_fraction=args.train_fraction,
     )
-    embedding_validation_dataset = stratified_sample(
-        validation_dataset, args.embedding_eval_limit, args.seed
-    )
-
     checkpoint_dir = args.output_dir / "checkpoints"
     final_model_dir = args.output_dir / "final"
     model = SetFitModel.from_pretrained(
@@ -210,7 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         num_epochs=args.epochs,
         batch_size=args.batch_size,
         num_iterations=args.num_iterations,
-        eval_strategy="epoch",
+        eval_strategy="no",
         save_strategy="epoch",
         save_total_limit=None,
         logging_strategy="epoch",
@@ -221,28 +206,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=embedding_validation_dataset,
-        metric=compute_binary_metrics,
+        metric=partial(compute_binary_metrics, label_names=label_names),
     )
 
     print(f"Training on {len(train_dataset)} instances")
-    print(
-        "Embedding validation uses "
-        f"{len(embedding_validation_dataset)} of {len(validation_dataset)} instances"
-    )
     trainer.train()
     trainer.model.save_pretrained(str(final_model_dir))
 
+    print("Fine-tuning complete; evaluating validation and test splits")
     metrics = {
         "validation": extract_evaluation_metrics(
             trainer.evaluate(validation_dataset, metric_key_prefix="validation"),
             "validation",
+            label_names,
         ),
         "test": extract_evaluation_metrics(
-            trainer.evaluate(test_dataset, metric_key_prefix="test"), "test"
+            trainer.evaluate(test_dataset, metric_key_prefix="test"),
+            "test",
+            label_names,
         ),
     }
-    write_metrics(args.output_dir, metrics)
+    write_metrics(args.output_dir, metrics, label_names)
+    print(f"Detected label order: [{', '.join(label_names)}]")
     print(json.dumps(metrics, indent=2, sort_keys=True))
     print(f"Final model: {final_model_dir}")
     print(f"Epoch checkpoints: {checkpoint_dir}")

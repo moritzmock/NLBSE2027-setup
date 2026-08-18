@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from functools import partial
 from typing import Any, Sequence
 
 import numpy as np
 
 from utils import (
-    LABEL_NAMES,
     add_common_training_arguments,
     compute_binary_metrics,
     extract_evaluation_metrics,
@@ -77,12 +77,16 @@ def sigmoid(logits: Any) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-np.clip(values, -500, 500)))
 
 
-def compute_metrics(eval_prediction: Any) -> dict[str, float]:
+def compute_metrics(
+    eval_prediction: Any, label_names: tuple[str, ...] | None = None
+) -> dict[str, float]:
     logits = eval_prediction.predictions
     if isinstance(logits, tuple):
         logits = logits[0]
     predictions = (sigmoid(logits) >= 0.5).astype(np.int64)
-    return compute_binary_metrics(predictions, eval_prediction.label_ids)
+    return compute_binary_metrics(
+        predictions, eval_prediction.label_ids, label_names=label_names
+    )
 
 
 def tokenize_dataset(dataset: Any, tokenizer: Any, max_length: int) -> Any:
@@ -115,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         Trainer,
         TrainingArguments,
     ) = import_training_dependencies()
-    train_dataset, validation_dataset, test_dataset = load_prepared_splits(
+    train_dataset, validation_dataset, test_dataset, label_names = load_prepared_splits(
         load_dataset, args.data_dir, args.train_limit, args.seed
     )
 
@@ -126,11 +130,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     test_dataset = tokenize_dataset(test_dataset, tokenizer, args.max_length)
 
-    id2label = {index: name for index, name in enumerate(LABEL_NAMES)}
+    id2label = {index: name for index, name in enumerate(label_names)}
     label2id = {name: index for index, name in id2label.items()}
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_id,
-        num_labels=len(LABEL_NAMES),
+        num_labels=len(label_names),
         problem_type="multi_label_classification",
         id2label=id2label,
         label2id=label2id,
@@ -160,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         eval_dataset=validation_dataset,
         processing_class=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
-        compute_metrics=compute_metrics,
+        compute_metrics=partial(compute_metrics, label_names=label_names),
     )
 
     print(f"Training on {len(train_dataset)} instances")
@@ -174,12 +178,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 validation_dataset, metric_key_prefix="validation"
             ),
             "validation",
+            label_names,
         ),
         "test": extract_evaluation_metrics(
-            trainer.evaluate(test_dataset, metric_key_prefix="test"), "test"
+            trainer.evaluate(test_dataset, metric_key_prefix="test"),
+            "test",
+            label_names,
         ),
     }
-    write_metrics(args.output_dir, metrics)
+    write_metrics(args.output_dir, metrics, label_names)
+    print(f"Detected label order: [{', '.join(label_names)}]")
     print(json.dumps(metrics, indent=2, sort_keys=True))
     print(f"Final model: {final_model_dir}")
     print(f"Epoch checkpoints: {checkpoint_dir}")
