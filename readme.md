@@ -2,7 +2,10 @@
 
 This repository builds a unified function-level dataset from the three
 MADE-WIC datasets and fine-tunes either a SetFit or CodeBERT multi-output
-classifier on the result. The two prediction targets are:
+classifier on the result. The public-facing description of the proposed
+NLBSE'27 competition is available in [webpage.md](webpage.md).
+
+The two prediction targets are:
 
 1. Whether a function contains a weakness or vulnerability.
 2. Whether the function is positive according to MAT.
