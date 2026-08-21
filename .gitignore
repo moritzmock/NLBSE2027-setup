@@ -6,6 +6,7 @@ MADE-WIC/
 __pycache__/
 curated_dataset_steps/
 curated_dataset_4labels_steps/
+code-classification/
 env/
 data/
 models/
